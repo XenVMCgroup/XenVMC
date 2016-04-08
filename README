@@ -1,0 +1,120 @@
+/*
+ *  XenVMC -- A Residency Aware Transparent Inter-VM Network Communication Accelerator
+ *    Copyright (C) 2012-2016 XenVMC Group of NUDT
+ *  Authors:
+ *      Ren Yi - National University of Defense Technology(renyi@nudt.edu.cn, yiren_xenvmc@163.com)
+ *      Liu Renshi(Newcent) - National University of Defense Technology (liurenshi_1989@163.com)
+ *      You Ziqi(Ziv) - National University of Defense Technology(yzq529@qq.com)
+ *
+ * This program is free software; you can redistribute it and/or
+ * modify it under the terms of the GNU General Public License
+ * version 2 as published by the Free Software Foundation.
+ *
+ * This program is distributed in the hope that it will be useful,
+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+ * GNU General Public License for more details
+ *
+ *
+ */
+
+
+
+What is XenVMC?
+===============
+XenVMC is a residency aware transparent Inter-VM network communication  accelerator.
+It bypasses traditional network data transmission path between Linux DomUs with shared-momory channels when 
+the communicating VMs are on the same physical machine. XenVMC is designed under three main principles: 
+
+ - High Performance;
+    XenVMC intercepts network requests at the System Call level and forwards them to 
+    the shared-memory channels, which leads XenVMC to shorter communication paths 
+    and less switches between the VMs and VMM.
+   The evaluation shows that XenVMC improves the throughput up to about a factor of 10, compared with the 
+   netfront-netback mode of Xen when communicating VM peers are co-resident.
+    (we use netperf-2.6.0 as the benchmark)
+    
+ - Multi-level Transparency;
+    XenVMC achieves multi-level transparency. That is to say, you can use XenVMC without modifying Xen, 
+	Linux Kernel or  applicaions.
+    
+ - VM Live Migration Supporting;
+    XenVMC supports on-demand co-resident VM detection and automatic switch between local shared memory 
+	channel and traditional network path to retain the benefits of VM live migration and the flexibility 
+	for VM deployment.
+
+
+Curently, XenVMC supports both TCP and UDP workloads. 
+
+Get Source Code
+===============
+We publish the latest release here: https://github.com/XenVMCgroup/XenVMC
+
+Running Environment
+===================
+We test XenVMC on following platform: 
+ - Xen-4.5.1
+ - paravirtualized Linux-3.13.0
+
+XenVMC Binary Components
+========================
+XenVMC consists of two kernel modules: 
+ - xenvmc_backend.ko
+    This is a kernel module which should be inserted into Dom0. This module is responsible for co-resident 
+	VMs detection and membership maintainence and notifies all DomUs which have  installed xenvmc_frontend.ko. 
+ - xenvmc_frontend.ko
+    This kernel module should be inserted into DomUs which are willing to enable inter-VM communication 
+	optimization by XenVMC. 
+    
+Building and Installing
+=======================
+1. Download XenVMC tarball file and decompress it into your workpalce. 
+    
+    # tar -xzvf xenvmc.tar.gz
+    
+2. cd to XenVMC directory.
+
+3. Build XenVMC. 
+
+    # make
+    
+    If building is successful, you will see two kernel moudles(xenvmc_backend.ko 
+    and xenvmc_frontend.ko)being created. 
+    
+    Note that we use the same kernel version on DomUs and Dom0. If  not, you may have to recompile it with 
+	your specific kernel version.
+
+4. Install XenVMC
+    
+    Copy xenvmc_backend.ko to Dom0, and run command as follows:
+    
+    # insmod xenvmc_backend.ko
+    
+    This command needs root privilege.
+    
+    Copy xenvmc_frontend.ko to DomUs you wish to enable XenVMC, and run command as 
+    follows:
+    
+    # insmod xenvmc_frontend.ko
+    
+    This command needs a root privilege.
+    
+    If everything is all right, you can get notification information on system log. 
+    
+Using XenVMC
+============
+XenVMC is designed fully transparent to user level applications. If you've successfully finish above 
+installation, congratulations, XenVMC is  enabled. 
+
+Legacy network applications can use XenVMC without modification to the application itself, the Linux 
+kernel and the VMM. When two applicaions are communicating, XenVMC will detect the destination automatically. 
+If the destination is a co-resident VM,  the data will be transmitted via the shared-memory channel. 
+From a VM administrator's perspective, he doesn't need any extra operations to make XenVMC work.  
+
+Welcome all feedback
+==================
+You can email the authors if you have any suggestions or if you find any bugs. We really appreciate it.
+The author's and their email adresses are as follows:
+    * Ren Yi - National University of Defense Technology(renyi@nudt.edu.cn, yiren_xenvmc@163.com)
+    * Liu Renshi(Newcent) - National University of Defense Technology (liurenshi_1989@163.com)
+    * You Ziqi(Ziv) - National University of Defense Technology(yzq529@qq.com)
