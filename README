@@ -2,7 +2,8 @@
  *  XenVMC -- A Residency Aware Transparent Inter-VM Network Communication Accelerator
  *    Copyright (C) 2012-2016 XenVMC Group of NUDT
  *  Authors:
- *      Ren Yi - National University of Defense Technology(renyi@nudt.edu.cn, yiren_xenvmc@163.com)
+ *      Ren Yi - National University of Defense Technology(renyi@nudt.edu.cn, 
+ *		yiren_xenvmc@163.com)
  *      Liu Renshi(Newcent) - National University of Defense Technology (liurenshi_1989@163.com)
  *      You Ziqi(Ziv) - National University of Defense Technology(yzq529@qq.com)
  *
@@ -23,25 +24,26 @@
 What is XenVMC?
 ===============
 XenVMC is a residency aware transparent Inter-VM network communication  accelerator.
-It bypasses traditional network data transmission path between Linux DomUs with shared-momory channels when 
-the communicating VMs are on the same physical machine. XenVMC is designed under three main principles: 
+It bypasses traditional network data transmission path between Linux DomUs with shared-momory 
+channels when the communicating VMs are on the same physical machine. XenVMC is designed under 
+three main principles: 
 
  - High Performance;
     XenVMC intercepts network requests at the System Call level and forwards them to 
     the shared-memory channels, which leads XenVMC to shorter communication paths 
     and less switches between the VMs and VMM.
-   The evaluation shows that XenVMC improves the throughput up to about a factor of 10, compared with the 
-   netfront-netback mode of Xen when communicating VM peers are co-resident.
+    The evaluation shows that XenVMC improves the throughput up to about a factor of 8, 
+    compared with the netfront-netback mode of Xen when communicating VM peers are co-resident.
     (we use netperf-2.6.0 as the benchmark)
     
  - Multi-level Transparency;
-    XenVMC achieves multi-level transparency. That is to say, you can use XenVMC without modifying Xen, 
-	Linux Kernel or  applicaions.
+    XenVMC achieves multi-level transparency. That is to say, you can use XenVMC without 
+    modifying Xen, Linux Kernel or  applicaions.
     
  - VM Live Migration Supporting;
-    XenVMC supports on-demand co-resident VM detection and automatic switch between local shared memory 
-	channel and traditional network path to retain the benefits of VM live migration and the flexibility 
-	for VM deployment.
+    XenVMC supports on-demand co-resident VM detection and automatic switch between local 
+    shared memory channel and traditional network path to retain the benefits of VM live 
+    migration and the flexibility for VM deployment.
 
 
 Curently, XenVMC supports both TCP and UDP workloads. 
@@ -60,11 +62,12 @@ XenVMC Binary Components
 ========================
 XenVMC consists of two kernel modules: 
  - xenvmc_backend.ko
-    This is a kernel module which should be inserted into Dom0. This module is responsible for co-resident 
-	VMs detection and membership maintainence and notifies all DomUs which have  installed xenvmc_frontend.ko. 
+    This is a kernel module which should be inserted into Dom0. This module is responsible for 
+    co-resident VMs detection and membership maintainence and notifies all DomUs which have 
+    installed xenvmc_frontend.ko. 
  - xenvmc_frontend.ko
-    This kernel module should be inserted into DomUs which are willing to enable inter-VM communication 
-	optimization by XenVMC. 
+    This kernel module should be inserted into DomUs which are willing to enable inter-VM 
+    communication optimization by XenVMC. 
     
 Building and Installing
 =======================
@@ -81,8 +84,8 @@ Building and Installing
     If building is successful, you will see two kernel moudles(xenvmc_backend.ko 
     and xenvmc_frontend.ko)being created. 
     
-    Note that we use the same kernel version on DomUs and Dom0. If  not, you may have to recompile it with 
-	your specific kernel version.
+    Note that we use the same kernel version on DomUs and Dom0. If  not, you may have to recompile 
+    it with your specific kernel version.
 
 4. Install XenVMC
     
@@ -112,9 +115,65 @@ If the destination is a co-resident VM,  the data will be transmitted via the sh
 From a VM administrator's perspective, he doesn't need any extra operations to make XenVMC work.  
 
 Welcome all feedback
-==================
+====================
 You can email the authors if you have any suggestions or if you find any bugs. We really appreciate it.
-The author's and their email adresses are as follows:
+The authors and their email adresses are as follows:
     * Ren Yi - National University of Defense Technology(renyi@nudt.edu.cn, yiren_xenvmc@163.com)
     * Liu Renshi(Newcent) - National University of Defense Technology (liurenshi_1989@163.com)
     * You Ziqi(Ziv) - National University of Defense Technology(yzq529@qq.com)
+
+References
+==========
+COPYRIGHT: The following materials are copyrighted by the corresponding publishers (e.g. ACM, IEEE). 
+You should download them only if you accept and obey the terms and restrictions defined by the respective 
+publishers, including only use the downloaded materials for personal or educational purpose. The online 
+version may be slightly older than the printed version available at the respective publisher's website.
+
+Selected Publications：
+
+1. Yi Ren, Ling Liu, Qi Zhang, Qingbo Wu, Jianbo Guan, Jinzhu Kong, Huadong Dai, Lisong Shao: Shared 
+Memory Optimizations for Inter Virtual Machine Communication. Journal of ACM Computing Surveys(CSUR), 
+Volume 48 Issue 4, February 2016. Article No. 49. (http:)
+
+2. Yi Ren, Ling Liu, Qi Zhang, Qingbo Wu, Jie Yu, Jinzhu Kong, Jianbo Guan, Huadong Dai: Residency-Aware 
+Virtual Machine Communication Optimization: Design Choices and Techniques. In Proceedings of IEEE 6th 
+International Conference on Cloud Computing (Cloud 2013), June 27-July 2, 2013, Santa Clara Marriott, 
+CA, USA. ()
+
+3. Qi Zhang, Ling Liu, Yi Ren, Kisung Lee, Yuzhe Tang, Xu Zhao, Yang Zhou: Residency Aware Inter-VM Communication 
+in Virtualized Cloud: Performance Measurement and Analysis. In Proceedings of IEEE 6th International 
+Conference on Cloud Computing (CLOUD 2013). June 27-July 2, 2013, Santa Clara Marriott, CA, USA.
+()
+
+4. Yi Ren, Ling Liu, Xiaojian Liu, Jinzhu Kong, Huadong Dai, Qingbo Wu, Yuan Li: A fast and transparent 
+communication protocol for co-resident virtual machines. In Proceedings of 8th IEEE International Conference 
+on Collaborative Computing (CollaborateCom2012), October 14 - 17, 2012 Pittsburgh, Pennsylvania, USA. 
+()
+
+5. Renshi Liu. Study on Shared Memory based Optimization for Inter-VM Communication (In Chinese).  M. S. thesis, 
+National University of Defense Technology. March, 2016. （）
+
+(刘仁仕. 基于共享内存连接的虚拟机间通信优化机制研究. 硕士学位论文. 国防科学技术大学研究生院. 2016年3月)
+
+Presentation：
+
+Yi Ren. Co-location Aware Optimizations for Inter Virtual Machine Communication (In Chinese). Presentation (XenVMC). 
+January, 2016. ()
+
+(任怡. 共生关系感知的虚拟机间通信优化. 交流报告. 2016年1月)
+
+Patents：
+
+1. Yi Ren, Xiaojian Liu, et al. A Fast and Live Migration Enabled Inter-VM Communication Method. 
+Granted Chinese patent: ZL20100198970.9
+
+(一种支持在线迁移的虚拟机间快速通信方法. 中国发明专利. 专利授权号：ZL20100198970.9)
+
+2. Yi Ren, Qingbo Wu, Renshi Liu, Huadong Dai, et al. A Transparent and Dynamic Switching Method for Alternative 
+Inter-VM Communication Modes. Pending Chinese patent: 201510092457
+
+(一种虚拟机域间通信模式的动态透明切换方法. 中国发明专利. 申请受理号：201510092457)
+
+3. Yi Ren, Renshi Liu, Ziqi You, et al. An Event Driven Transparent method for Dynamic Co-located VMs Discovery. 
+Pending Chinese patent: 201610025913.8
+(一种透明的基于事件驱动的共生虚拟机动态发现方法. 中国发明专利. 申请受理号：201610025913.8)
