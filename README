@@ -154,7 +154,6 @@ on Collaborative Computing (CollaborateCom2012), October 14 - 17, 2012 Pittsburg
 
 5. Renshi Liu. Study on Shared Memory based Optimization for Inter-VM Communication (In Chinese).  M. S. thesis, 
 National University of Defense Technology. March, 2016.
-(https://github.com/XenVMCgroup/XenVMC/tree/master/docs/presentation_YiRen_201601.pdf) 
 
 (刘仁仕. 基于共享内存连接的虚拟机间通信优化机制研究. 硕士学位论文. 国防科学技术大学研究生院. 2016年3月)
 
@@ -162,7 +161,7 @@ Presentation：
 
 Yi Ren. Co-location Aware Optimizations for Inter Virtual Machine Communication (In Chinese). Presentation (XenVMC). 
 January, 2016. 
-(https://github.com/XenVMCgroup/XenVMC/tree/master/docs/) 
+(https://github.com/XenVMCgroup/XenVMC/tree/master/docs/presentation_YiRen_201601.pdf) 
 
 (任怡. 共生关系感知的虚拟机间通信优化. 交流报告. 2016年1月)
 
