@@ -133,32 +133,36 @@ Selected Publications：
 
 1. Yi Ren, Ling Liu, Qi Zhang, Qingbo Wu, Jianbo Guan, Jinzhu Kong, Huadong Dai, Lisong Shao: Shared 
 Memory Optimizations for Inter Virtual Machine Communication. Journal of ACM Computing Surveys(CSUR), 
-Volume 48 Issue 4, February 2016. Article No. 49. (http:)
+Volume 48 Issue 4, February 2016. Article No. 49. 
+(https://github.com/XenVMCgroup/XenVMC/tree/master/docs/YiRen-ACMCSUR2016.pdf)
 
 2. Yi Ren, Ling Liu, Qi Zhang, Qingbo Wu, Jie Yu, Jinzhu Kong, Jianbo Guan, Huadong Dai: Residency-Aware 
 Virtual Machine Communication Optimization: Design Choices and Techniques. In Proceedings of IEEE 6th 
 International Conference on Cloud Computing (Cloud 2013), June 27-July 2, 2013, Santa Clara Marriott, 
-CA, USA. ()
+CA, USA. 
+(https://github.com/XenVMCgroup/XenVMC/tree/master/docs/YiRen-Cloud2013.pdf)
 
 3. Qi Zhang, Ling Liu, Yi Ren, Kisung Lee, Yuzhe Tang, Xu Zhao, Yang Zhou: Residency Aware Inter-VM Communication 
 in Virtualized Cloud: Performance Measurement and Analysis. In Proceedings of IEEE 6th International 
 Conference on Cloud Computing (CLOUD 2013). June 27-July 2, 2013, Santa Clara Marriott, CA, USA.
-()
+(https://github.com/XenVMCgroup/XenVMC/tree/master/docs/QiZhang-Cloud2013.pdf)
 
 4. Yi Ren, Ling Liu, Xiaojian Liu, Jinzhu Kong, Huadong Dai, Qingbo Wu, Yuan Li: A fast and transparent 
 communication protocol for co-resident virtual machines. In Proceedings of 8th IEEE International Conference 
 on Collaborative Computing (CollaborateCom2012), October 14 - 17, 2012 Pittsburgh, Pennsylvania, USA. 
-()
+(https://github.com/XenVMCgroup/XenVMC/tree/master/docs/YiRen-CollaborateCom2012.pdf)
 
 5. Renshi Liu. Study on Shared Memory based Optimization for Inter-VM Communication (In Chinese).  M. S. thesis, 
-National University of Defense Technology. March, 2016. （）
+National University of Defense Technology. March, 2016.
+(https://github.com/XenVMCgroup/XenVMC/tree/master/docs/presentation_YiRen_201601.pdf) 
 
 (刘仁仕. 基于共享内存连接的虚拟机间通信优化机制研究. 硕士学位论文. 国防科学技术大学研究生院. 2016年3月)
 
 Presentation：
 
 Yi Ren. Co-location Aware Optimizations for Inter Virtual Machine Communication (In Chinese). Presentation (XenVMC). 
-January, 2016. ()
+January, 2016. 
+(https://github.com/XenVMCgroup/XenVMC/tree/master/docs/) 
 
 (任怡. 共生关系感知的虚拟机间通信优化. 交流报告. 2016年1月)
 
