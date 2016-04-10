@@ -1,5 +1,5 @@
 /*
- *  XenVMC -- A High Performance Inter-VM Network Communication Mechanism
+ *  XenVMC -- A Residency Aware Transparent Inter-VM Network Communication Accelerator
  *
  *  Authors:
  *  	Liu Renshi(newcent) - National University of Defense Technology (liurenshi_1989@163.com)

@@ -1,7 +1,6 @@
 /*
  *  XenLoop -- A High Performance Inter-VM Network Loopback 
  *
- *  Installation and Usage instructions
  *
  *  Authors: 
  *  	Jian Wang - Binghamton University (jianwang@cs.binghamton.edu)
