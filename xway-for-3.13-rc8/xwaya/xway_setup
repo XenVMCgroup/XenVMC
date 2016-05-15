@@ -1,0 +1,4 @@
+./xwaya_load
+echo "1" > /proc/xway
+./xwayd 4444 &
+

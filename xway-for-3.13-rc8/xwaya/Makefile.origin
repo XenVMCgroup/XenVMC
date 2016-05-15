@@ -1,0 +1,9 @@
+obj-m	:= xwaya.o
+#KDIR	:= /lib/modules/2.6.16.29-xenU/build
+KDIR	:= /home/newcent/Project/linux_kernel_xen
+PWD	:= $(shell pwd)
+
+default:
+	make -C $(KDIR) SUBDIRS=$(PWD) modules_install
+clean:
+	make -C $(KDIR) SUBDIRS=$(PWD) clean

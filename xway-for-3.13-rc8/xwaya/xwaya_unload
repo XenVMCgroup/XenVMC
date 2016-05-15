@@ -1,0 +1,7 @@
+#!/bin/sh
+module="xwaya"
+device="xwaya"
+
+/sbin/rmmod $module $* || exit 1
+
+rm -rf /dev/${device}

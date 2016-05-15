@@ -1,0 +1,65 @@
+diff --git a/xen/arch/x86/x86_64/entry.S b/xen/arch/x86/x86_64/entry.S
+index 3ea4683..b3993b0 100644
+--- a/xen/arch/x86/x86_64/entry.S
++++ b/xen/arch/x86/x86_64/entry.S
+@@ -757,6 +757,8 @@ ENTRY(hypercall_table)
+         .quad do_domctl
+         .quad do_kexec_op
+         .quad do_tmem_op
++	.quad do_ni_hypercall
++	.quad do_get_domid
+         .rept __HYPERVISOR_arch_0-((.-hypercall_table)/8)
+         .quad do_ni_hypercall
+         .endr
+@@ -805,6 +807,8 @@ ENTRY(hypercall_args_table)
+         .byte 1 /* do_domctl            */
+         .byte 2 /* do_kexec             */
+         .byte 1 /* do_tmem_op           */
++	.byte 0 /* do_ni_hypercall      */
++	.byte 0 /* do_get_domid         */
+         .rept __HYPERVISOR_arch_0-(.-hypercall_args_table)
+         .byte 0 /* do_ni_hypercall      */
+         .endr
+diff --git a/xen/common/domctl.c b/xen/common/domctl.c
+index af3614b..50cf5e8 100644
+--- a/xen/common/domctl.c
++++ b/xen/common/domctl.c
+@@ -901,7 +901,10 @@ long do_domctl(XEN_GUEST_HANDLE_PARAM(xen_domctl_t) u_domctl)
+ 
+     return ret;
+ }
+-
++long do_get_domid(void)
++{
++	return current->domain->domain_id;
++}
+ /*
+  * Local variables:
+  * mode: C
+diff --git a/xen/include/public/xen.h b/xen/include/public/xen.h
+index 8c5697e..8141cd1 100644
+--- a/xen/include/public/xen.h
++++ b/xen/include/public/xen.h
+@@ -101,6 +101,7 @@ DEFINE_XEN_GUEST_HANDLE(xen_ulong_t);
+ #define __HYPERVISOR_kexec_op             37
+ #define __HYPERVISOR_tmem_op              38
+ #define __HYPERVISOR_xc_reserved_op       39 /* reserved for XenClient */
++#define __HYPERVISOR_get_domid   	  40
+ 
+ /* Architecture-specific hypercall definitions. */
+ #define __HYPERVISOR_arch_0               48
+diff --git a/xen/include/xen/hypercall.h b/xen/include/xen/hypercall.h
+index a9e5229..1cdff2a 100644
+--- a/xen/include/xen/hypercall.h
++++ b/xen/include/xen/hypercall.h
+@@ -127,7 +127,9 @@ extern long
+ do_kexec_op(
+     unsigned long op,
+     XEN_GUEST_HANDLE_PARAM(void) uarg);
+-
++extern long
++do_get_domid(
++	void);
+ extern long
+ do_xsm_op(
+     XEN_GUEST_HANDLE_PARAM(xsm_op_t) u_xsm_op);

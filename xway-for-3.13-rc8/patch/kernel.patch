@@ -1,0 +1,641 @@
+diff --git a/arch/ia64/include/asm/xen/hypercall.h b/arch/ia64/include/asm/xen/hypercall.h
+index ed28bcd..3320a23 100644
+--- a/arch/ia64/include/asm/xen/hypercall.h
++++ b/arch/ia64/include/asm/xen/hypercall.h
+@@ -228,7 +228,12 @@ HYPERVISOR_shutdown(
+ 
+ 	return rc;
+ }
+-
++static inline int
++HYPERVISOR_get_domid(
++void)
++{
++   return _hypercall0(int, get_domid);
++}
+ /* for netfront.c, netback.c */
+ #define MULTI_UVMFLAGS_INDEX 0 /* XXX any value */
+ 
+diff --git a/arch/x86/include/asm/xen/hypercall.h b/arch/x86/include/asm/xen/hypercall.h
+index e709884..a875ac9 100644
+--- a/arch/x86/include/asm/xen/hypercall.h
++++ b/arch/x86/include/asm/xen/hypercall.h
+@@ -465,6 +465,13 @@ HYPERVISOR_tmem_op(
+ 	return _hypercall1(int, tmem_op, op);
+ }
+ 
++static inline int
++HYPERVISOR_get_domid(
++void)
++{
++	return _hypercall0(int,get_domid); 
++}
++
+ static inline void
+ MULTI_fpu_taskswitch(struct multicall_entry *mcl, int set)
+ {
+diff --git a/drivers/w1/w1.c b/drivers/w1/w1.c
+index 66efa96..51ce6b8 100644
+--- a/drivers/w1/w1.c
++++ b/drivers/w1/w1.c
+@@ -104,6 +104,7 @@ static ssize_t name_show(struct device *dev, struct device_attribute *attr, char
+ }
+ static DEVICE_ATTR_RO(name);
+ 
++
+ static ssize_t id_show(struct device *dev,
+ 	struct device_attribute *attr, char *buf)
+ {
+@@ -713,7 +714,7 @@ static int w1_attach_slave_device(struct w1_master *dev, struct w1_reg_num *rn)
+ 
+ 	memset(&msg, 0, sizeof(msg));
+ 	memcpy(&sl->reg_num, rn, sizeof(sl->reg_num));
+-	atomic_set(&sl->refcnt, 0);
++	atomic_set(&sl->sddd, 0);
+ 	init_completion(&sl->released);
+ 
+ 	/* slave modules need to be loaded in a context with unlocked mutex */
+diff --git a/drivers/xen/Kconfig b/drivers/xen/Kconfig
+index c794ea1..fb5de93 100644
+--- a/drivers/xen/Kconfig
++++ b/drivers/xen/Kconfig
+@@ -1,5 +1,10 @@
+ menu "Xen driver support"
+ 	depends on XEN
++config XEN_XWAY
++	bool "Xway : Xen-interdomain fastest TCP/IP socket communication"
++	default y if XEN && !IPV6
++	help
++		Ultimately fasten interdomain TCP/IP socket communication
+ 
+ config XEN_BALLOON
+ 	bool "Xen memory balloon driver"
+@@ -241,4 +246,5 @@ config XEN_MCE_LOG
+ config XEN_HAVE_PVMMU
+        bool
+ 
++
+ endmenu
+diff --git a/include/net/udp.h b/include/net/udp.h
+index a24f0f3..773867a 100644
+--- a/include/net/udp.h
++++ b/include/net/udp.h
+@@ -272,6 +272,7 @@ int udpv4_offload_init(void);
+ void udp_init(void);
+ 
+ void udp_encap_enable(void);
++int udp_queue_rcv_skb(struct sock *sk, struct sk_buff *skb);
+ #if IS_ENABLED(CONFIG_IPV6)
+ void udpv6_encap_enable(void);
+ #endif
+diff --git a/include/xen/interface/xen.h b/include/xen/interface/xen.h
+index 53ec416..8106338 100644
+--- a/include/xen/interface/xen.h
++++ b/include/xen/interface/xen.h
+@@ -58,6 +58,7 @@
+ #define __HYPERVISOR_physdev_op           33
+ #define __HYPERVISOR_hvm_op               34
+ #define __HYPERVISOR_tmem_op              38
++#define __HYPERVISOR_get_domid		  40
+ 
+ /* Architecture-specific hypercall definitions. */
+ #define __HYPERVISOR_arch_0               48
+diff --git a/include/xen/xenbus.h b/include/xen/xenbus.h
+index 569c07f..40c9a30 100644
+--- a/include/xen/xenbus.h
++++ b/include/xen/xenbus.h
+@@ -122,6 +122,12 @@ struct xenbus_transaction
+ 	u32 id;
+ };
+ 
++struct xs_permission
++{
++	unsigned int id;
++	char perms;
++};
++
+ /* Nil transaction ID. */
+ #define XBT_NIL ((struct xenbus_transaction) { 0 })
+ 
+@@ -136,6 +142,7 @@ int xenbus_mkdir(struct xenbus_transaction t,
+ int xenbus_exists(struct xenbus_transaction t,
+ 		  const char *dir, const char *node);
+ int xenbus_rm(struct xenbus_transaction t, const char *dir, const char *node);
++int xenbus_setperms(struct xenbus_transaction t, const char *path, struct xs_permission *perm, unsigned int perm_num);
+ int xenbus_transaction_start(struct xenbus_transaction *t);
+ int xenbus_transaction_end(struct xenbus_transaction t, int abort);
+ 
+diff --git a/ipc/msg.c b/ipc/msg.c
+index 558aa91..64d3e2c 100644
+--- a/ipc/msg.c
++++ b/ipc/msg.c
+@@ -329,7 +329,7 @@ copy_msqid_to_user(void __user *buf, struct msqid64_ds *in, int version)
+ 
+ 		ipc64_perm_to_ipc_perm(&in->msg_perm, &out.msg_perm);
+ 
+-		out.msg_stime		= in->msg_stime;
++		out.msg_rtime		= in->msg_stime;
+ 		out.msg_rtime		= in->msg_rtime;
+ 		out.msg_ctime		= in->msg_ctime;
+ 
+diff --git a/mm/vmalloc.c b/mm/vmalloc.c
+index 0fdf968..3767cd7 100644
+--- a/mm/vmalloc.c
++++ b/mm/vmalloc.c
+@@ -1308,7 +1308,7 @@ static struct vm_struct *__get_vm_area_node(unsigned long size,
+ 	struct vmap_area *va;
+ 	struct vm_struct *area;
+ 
+-	BUG_ON(in_interrupt());
++//	BUG_ON(in_interrupt());
+ 	if (flags & VM_IOREMAP)
+ 		align = 1ul << clamp(fls(size), PAGE_SHIFT, IOREMAP_MAX_ORDER);
+ 
+diff --git a/net/ipv4/Makefile b/net/ipv4/Makefile
+index 4b81e91..248e330 100644
+--- a/net/ipv4/Makefile
++++ b/net/ipv4/Makefile
+@@ -13,6 +13,7 @@ obj-y     := route.o inetpeer.o protocol.o \
+ 	     fib_frontend.o fib_semantics.o fib_trie.o \
+ 	     inet_fragment.o ping.o ip_tunnel_core.o
+ 
++obj-$(CONFIG_XEN_XWAY) += xway_proto.o xd.o
+ obj-$(CONFIG_NET_IP_TUNNEL) += ip_tunnel.o
+ obj-$(CONFIG_SYSCTL) += sysctl_net_ipv4.o
+ obj-$(CONFIG_PROC_FS) += proc.o
+diff --git a/net/ipv4/af_inet.c b/net/ipv4/af_inet.c
+index 70011e0..043648e 100644
+--- a/net/ipv4/af_inet.c
++++ b/net/ipv4/af_inet.c
+@@ -118,6 +118,10 @@
+ #ifdef CONFIG_IP_MROUTE
+ #include <linux/mroute.h>
+ #endif
++#ifdef CONFIG_XEN_XWAY
++#include <net/xway_proto.h>
++#include <linux/delay.h>
++#endif
+ 
+ 
+ /* The inetsw table contains everything that inet_create needs to
+@@ -433,7 +437,9 @@ int inet_bind(struct socket *sock, struct sockaddr *uaddr, int addr_len)
+ 	struct sockaddr_in *addr = (struct sockaddr_in *)uaddr;
+ 	struct sock *sk = sock->sk;
+ 	struct inet_sock *inet = inet_sk(sk);
++	printk("inet_bind:line440");
+ 	struct net *net = sock_net(sk);
++	printk("inet_bind:line442");
+ 	unsigned short snum;
+ 	int chk_addr_ret;
+ 	int err;
+@@ -441,6 +447,7 @@ int inet_bind(struct socket *sock, struct sockaddr *uaddr, int addr_len)
+ 	/* If the socket has its own bind function then use it. (RAW) */
+ 	if (sk->sk_prot->bind) {
+ 		err = sk->sk_prot->bind(sk, uaddr, addr_len);
++		printk("inet_bind:line4450");
+ 		goto out;
+ 	}
+ 	err = -EINVAL;
+@@ -452,13 +459,16 @@ int inet_bind(struct socket *sock, struct sockaddr *uaddr, int addr_len)
+ 		 * only if s_addr is INADDR_ANY.
+ 		 */
+ 		err = -EAFNOSUPPORT;
++		printk("inet_bind:line462");
+ 		if (addr->sin_family != AF_UNSPEC ||
+-		    addr->sin_addr.s_addr != htonl(INADDR_ANY))
++		    addr->sin_addr.s_addr != htonl(INADDR_ANY)){
++			printk("inet_bind:line465");
+ 			goto out;
++		}
+ 	}
+ 
+ 	chk_addr_ret = inet_addr_type(net, addr->sin_addr.s_addr);
+-
++	printk("inet_bind:line471");
+ 	/* Not specified by any standard per-se, however it breaks too
+ 	 * many applications when removed.  It is unfortunate since
+ 	 * allowing applications to make a non-local bind solves
+@@ -472,14 +482,18 @@ int inet_bind(struct socket *sock, struct sockaddr *uaddr, int addr_len)
+ 	    addr->sin_addr.s_addr != htonl(INADDR_ANY) &&
+ 	    chk_addr_ret != RTN_LOCAL &&
+ 	    chk_addr_ret != RTN_MULTICAST &&
+-	    chk_addr_ret != RTN_BROADCAST)
++	    chk_addr_ret != RTN_BROADCAST){
++		printk("inet_bind:line486");
+ 		goto out;
++	}
+ 
+ 	snum = ntohs(addr->sin_port);
+ 	err = -EACCES;
+ 	if (snum && snum < PROT_SOCK &&
+-	    !ns_capable(net->user_ns, CAP_NET_BIND_SERVICE))
++	    !ns_capable(net->user_ns, CAP_NET_BIND_SERVICE)){
++		printk("inet_bind:line494");
+ 		goto out;
++	}
+ 
+ 	/*      We keep a pair of addresses. rcv_saddr is the one
+ 	 *      used by hash lookups, and saddr is used for transmit.
+@@ -488,35 +502,45 @@ int inet_bind(struct socket *sock, struct sockaddr *uaddr, int addr_len)
+ 	 *      would be illegal to use them (multicast/broadcast) in
+ 	 *      which case the sending device address is used.
+ 	 */
++	printk("inet_bind:line505");
+ 	lock_sock(sk);
+-
++	printk("inet_bind:line507");
+ 	/* Check these errors (active socket, double bind). */
+ 	err = -EINVAL;
+ 	if (sk->sk_state != TCP_CLOSE || inet->inet_num)
+ 		goto out_release_sock;
+ 
+ 	inet->inet_rcv_saddr = inet->inet_saddr = addr->sin_addr.s_addr;
+-	if (chk_addr_ret == RTN_MULTICAST || chk_addr_ret == RTN_BROADCAST)
++	if (chk_addr_ret == RTN_MULTICAST || chk_addr_ret == RTN_BROADCAST){
++		printk("inet_bind:line515");
+ 		inet->inet_saddr = 0;  /* Use device */
+-
++	}
++	printk("inet_bind:line518");
+ 	/* Make sure we are allowed to bind here. */
+ 	if (sk->sk_prot->get_port(sk, snum)) {
++		printk("inet_bind:line521");
+ 		inet->inet_saddr = inet->inet_rcv_saddr = 0;
+ 		err = -EADDRINUSE;
+ 		goto out_release_sock;
+ 	}
+-
+-	if (inet->inet_rcv_saddr)
++	if (inet->inet_rcv_saddr){
++		printk("inet_bind:line527");
+ 		sk->sk_userlocks |= SOCK_BINDADDR_LOCK;
+-	if (snum)
++	}
++	if (snum){
++		printk("inet_bind:line531");
+ 		sk->sk_userlocks |= SOCK_BINDPORT_LOCK;
++	}
+ 	inet->inet_sport = htons(inet->inet_num);
+ 	inet->inet_daddr = 0;
+ 	inet->inet_dport = 0;
+ 	sk_dst_reset(sk);
++	printk("inet_bind:line538");
+ 	err = 0;
+ out_release_sock:
++printk("inet_bind:line541");
+ 	release_sock(sk);
++	printk("inet_bind:line543");
+ out:
+ 	return err;
+ }
+@@ -903,6 +927,28 @@ static int inet_compat_ioctl(struct socket *sock, unsigned int cmd, unsigned lon
+ 	return err;
+ }
+ #endif
++#ifdef CONFIG_XEN_XWAY
++const struct proto_ops inet_stream_ops = {
++   .family        = PF_INET,
++   .owner         = THIS_MODULE,
++   .release       = inet_release,
++   .bind          = inet_bind,
++   .connect       = xsw_stream_connect,
++   .socketpair    = sock_no_socketpair,
++   .accept        = xsw_accept,
++   .getname       = inet_getname,
++   .poll          = xsw_tcp_poll,
++   .ioctl         = inet_ioctl,
++   .listen        = inet_listen,
++   .shutdown      = xsw_shutdown,
++   .setsockopt    = sock_common_setsockopt,
++   .getsockopt    = sock_common_getsockopt,
++   .sendmsg       = inet_sendmsg,
++   .recvmsg       = sock_common_recvmsg,
++   .mmap          = sock_no_mmap,
++   .sendpage      = xsw_tcp_sendpage,
++};
++#else // CONFIG_XEN_XWAY
+ 
+ const struct proto_ops inet_stream_ops = {
+ 	.family		   = PF_INET,
+@@ -930,6 +976,7 @@ const struct proto_ops inet_stream_ops = {
+ 	.compat_ioctl	   = inet_compat_ioctl,
+ #endif
+ };
++#endif
+ EXPORT_SYMBOL(inet_stream_ops);
+ 
+ const struct proto_ops inet_dgram_ops = {
+diff --git a/net/ipv4/inet_connection_sock.c b/net/ipv4/inet_connection_sock.c
+index fc0e649..8939ae2 100644
+--- a/net/ipv4/inet_connection_sock.c
++++ b/net/ipv4/inet_connection_sock.c
+@@ -95,31 +95,41 @@ EXPORT_SYMBOL_GPL(inet_csk_bind_conflict);
+ int inet_csk_get_port(struct sock *sk, unsigned short snum)
+ {
+ 	struct inet_hashinfo *hashinfo = sk->sk_prot->h.hashinfo;
++	printk("get_port:line98");
+ 	struct inet_bind_hashbucket *head;
+ 	struct inet_bind_bucket *tb;
+ 	int ret, attempts = 5;
+ 	struct net *net = sock_net(sk);
++	printk("get_port:line103");
+ 	int smallest_size = -1, smallest_rover;
+ 	kuid_t uid = sock_i_uid(sk);
++	printk("get_port:line106");
+ 
+ 	local_bh_disable();
+ 	if (!snum) {
+ 		int remaining, rover, low, high;
+ 
+ again:
+ 		inet_get_local_port_range(net, &low, &high);
++		printk("get_port:line115");
+ 		remaining = (high - low) + 1;
+ 		smallest_rover = rover = net_random() % remaining + low;
+ 
+ 		smallest_size = -1;
+ 		do {
+-			if (inet_is_reserved_local_port(rover))
++			if (inet_is_reserved_local_port(rover)){
++				printk("get_port:line122");
+ 				goto next_nolock;
++			}
+ 			head = &hashinfo->bhash[inet_bhashfn(net, rover,
+ 					hashinfo->bhash_size)];
+ 			spin_lock(&head->lock);
+ 			inet_bind_bucket_for_each(tb, &head->chain)
+ 				if (net_eq(ib_net(tb), net) && tb->port == rover) {
+ 					if (((tb->fastreuse > 0 &&
+ 					      sk->sk_reuse &&
+ 					      sk->sk_state != TCP_LISTEN) ||
+@@ -129,13 +139,16 @@ again:
+ 					    (tb->num_owners < smallest_size || smallest_size == -1)) {
+ 						smallest_size = tb->num_owners;
+ 						smallest_rover = rover;
+ 						if (atomic_read(&hashinfo->bsockets) > (high - low) + 1 &&
+ 						    !inet_csk(sk)->icsk_af_ops->bind_conflict(sk, tb, false)) {
+ 							snum = smallest_rover;
+ 							goto tb_found;
+ 						}
+ 					}
+ 					if (!inet_csk(sk)->icsk_af_ops->bind_conflict(sk, tb, false)) {
+ 						snum = rover;
+ 						goto tb_found;
+ 					}
+@@ -143,8 +156,10 @@ again:
+ 				}
+ 			break;
+ 		next:
+ 			spin_unlock(&head->lock);
+ 		next_nolock:
+ 			if (++rover > high)
+ 				rover = low;
+ 		} while (--remaining > 0);
+@@ -171,15 +186,21 @@ again:
+ have_snum:
+ 		head = &hashinfo->bhash[inet_bhashfn(net, snum,
+ 				hashinfo->bhash_size)];
+ 		spin_lock(&head->lock);
+ 		inet_bind_bucket_for_each(tb, &head->chain)
+-			if (net_eq(ib_net(tb), net) && tb->port == snum)
++			if (net_eq(ib_net(tb), net) && tb->port == snum){
+ 				goto tb_found;
++			}
+ 	}
+ 	tb = NULL;
+ 	goto tb_not_found;
+ tb_found:
+ 	if (!hlist_empty(&tb->owners)) {
+ 		if (sk->sk_reuse == SK_FORCE_REUSE)
+ 			goto success;
+ 
+@@ -188,14 +209,18 @@ tb_found:
+ 		     (tb->fastreuseport > 0 &&
+ 		      sk->sk_reuseport && uid_eq(tb->fastuid, uid))) &&
+ 		    smallest_size == -1) {
+ 			goto success;
+ 		} else {
+ 			ret = 1;
+ 			if (inet_csk(sk)->icsk_af_ops->bind_conflict(sk, tb, true)) {
+ 				if (((sk->sk_reuse && sk->sk_state != TCP_LISTEN) ||
+ 				     (tb->fastreuseport > 0 &&
+ 				      sk->sk_reuseport && uid_eq(tb->fastuid, uid))) &&
+ 				    smallest_size != -1 && --attempts >= 0) {
+ 					spin_unlock(&head->lock);
+ 					goto again;
+ 				}
+@@ -207,9 +232,12 @@ tb_found:
+ tb_not_found:
+ 	ret = 1;
+ 	if (!tb && (tb = inet_bind_bucket_create(hashinfo->bind_bucket_cachep,
+-					net, head, snum)) == NULL)
++					net, head, snum)) == NULL){
+ 		goto fail_unlock;
++	}
+ 	if (hlist_empty(&tb->owners)) {
+ 		if (sk->sk_reuse && sk->sk_state != TCP_LISTEN)
+ 			tb->fastreuse = 1;
+ 		else
+@@ -228,14 +256,20 @@ tb_not_found:
+ 			tb->fastreuseport = 0;
+ 	}
+ success:
+-	if (!inet_csk(sk)->icsk_bind_hash)
++	if (!inet_csk(sk)->icsk_bind_hash){
+ 		inet_bind_hash(sk, tb, snum);
++	}
+ 	WARN_ON(inet_csk(sk)->icsk_bind_hash != tb);
+ 	ret = 0;
+ 
+ fail_unlock:
+ 	spin_unlock(&head->lock);
+ fail:
+ 	local_bh_enable();
+ 	return ret;
+ }
+diff --git a/net/ipv4/ipcomp.c b/net/ipv4/ipcomp.c
+index 826be4c..92f98ed 100644
+--- a/net/ipv4/ipcomp.c
++++ b/net/ipv4/ipcomp.c
+@@ -8,7 +8,7 @@
+  * Software Foundation; either version 2 of the License, or (at your option)
+  * any later version.
+  *
+- * Todo:
++ * Todo:.
+  *   - Tunable compression parameters.
+  *   - Compression stats.
+  *   - Adaptive compression.
+diff --git a/net/ipv4/tcp_ipv4.c b/net/ipv4/tcp_ipv4.c
+index 0672139..01875b9 100644
+--- a/net/ipv4/tcp_ipv4.c
++++ b/net/ipv4/tcp_ipv4.c
+@@ -85,6 +85,9 @@
+ 
+ #include <linux/crypto.h>
+ #include <linux/scatterlist.h>
++#ifdef CONFIG_XEN_XWAY
++#include <net/xway_proto.h>
++#endif
+ 
+ int sysctl_tcp_tw_reuse __read_mostly;
+ int sysctl_tcp_low_latency __read_mostly;
+@@ -2132,7 +2135,8 @@ static const struct tcp_sock_af_ops tcp_sock_ipv4_specific = {
+ /* NOTE: A lot of things set to zero explicitly by call to
+  *       sk_alloc() so need not be done here.
+  */
+-static int tcp_v4_init_sock(struct sock *sk)
++//static 
++int tcp_v4_init_sock(struct sock *sk)
+ {
+ 	struct inet_connection_sock *icsk = inet_csk(sk);
+ 
+@@ -2718,6 +2722,43 @@ void tcp4_proc_exit(void)
+ 	unregister_pernet_subsys(&tcp4_net_ops);
+ }
+ #endif /* CONFIG_PROC_FS */
++#ifdef CONFIG_XEN_XWAY
++struct proto tcp_prot = {
++   .name           = "TCP",
++   .owner          = THIS_MODULE,
++   .close          = xsw_tcp_close,
++   .connect        = tcp_v4_connect,
++   .disconnect     = tcp_disconnect,
++   .accept         = inet_csk_accept,
++   .ioctl          = tcp_ioctl,
++   .init           = xp_v4_init_sock,
++   .destroy        = tcp_v4_destroy_sock,
++   .shutdown       = tcp_shutdown,
++   .setsockopt     = tcp_setsockopt,
++   .getsockopt     = tcp_getsockopt,
++   .sendmsg        = xsw_tcp_sendmsg,
++   .recvmsg        = xsw_tcp_recvmsg,
++   .backlog_rcv        = tcp_v4_do_rcv,
++   .hash		= inet_hash,
++   .unhash		= inet_unhash,
++   .get_port		= inet_csk_get_port, 
++//   .hash           = tcp_v4_hash,
++//   .unhash         = tcp_unhash,
++//   .get_port       = tcp_v4_get_port,
++   .enter_memory_pressure  = tcp_enter_memory_pressure,
++   .sockets_allocated  = &tcp_sockets_allocated,
++   .orphan_count       = &tcp_orphan_count,
++   .memory_allocated   = &tcp_memory_allocated,
++   .memory_pressure    = &tcp_memory_pressure,
++   .sysctl_mem     = sysctl_tcp_mem,
++   .sysctl_wmem        = sysctl_tcp_wmem,
++   .sysctl_rmem        = sysctl_tcp_rmem,
++   .max_header     = MAX_TCP_HEADER,
++   .obj_size       = sizeof(struct xway_sock),
++   .twsk_prot      = &tcp_timewait_sock_ops,
++   .rsk_prot       = &tcp_request_sock_ops,
++};
++#else // CONFIG_XEN_XWAY
+ 
+ struct proto tcp_prot = {
+ 	.name			= "TCP",
+@@ -2767,6 +2808,7 @@ struct proto tcp_prot = {
+ 	.proto_cgroup		= tcp_proto_cgroup,
+ #endif
+ };
++#endif	// CONFIG_XEN_XWAY
+ EXPORT_SYMBOL(tcp_prot);
+ 
+ static int __net_init tcp_sk_init(struct net *net)
+@@ -2796,3 +2838,7 @@ void __init tcp_v4_init(void)
+ 	if (register_pernet_subsys(&tcp_sk_ops))
+ 		panic("Failed to create the TCP control socket.\n");
+ }
++#ifdef CONFIG_XEN_XWAY
++EXPORT_SYMBOL(tcp_v4_init_sock);
++#endif
++
+diff --git a/net/ipv4/udp.c b/net/ipv4/udp.c
+index a7e4729..676dda2 100644
+--- a/net/ipv4/udp.c
++++ b/net/ipv4/udp.c
+@@ -1571,6 +1571,7 @@ drop:
+ 	return -1;
+ }
+ 
++EXPORT_SYMBOL(udp_queue_rcv_skb);
+ 
+ static void flush_stack(struct sock **stack, unsigned int count,
+ 			struct sk_buff *skb, unsigned int final)
+@@ -1701,6 +1702,48 @@ static inline int udp4_csum_init(struct sk_buff *skb, struct udphdr *uh,
+ 	return 0;
+ }
+ 
++
++static void debug_skb(struct sk_buff *skb)
++{
++	struct ethhdr *e = (struct ethhdr *) skb->data;
++	struct sock *sk;
++	struct udphdr *uh;
++	unsigned short ulen;
++	struct rtable *rt = skb_rtable(skb);
++	__be32 saddr, daddr;
++	struct net *net = dev_net(skb->dev);
++
++        uh   = udp_hdr(skb);
++	ulen = ntohs(uh->len);
++	saddr = ip_hdr(skb)->saddr;
++	daddr = ip_hdr(skb)->daddr;
++
++	printk("dst:%02x-%02x-%02x-%02x-%02x-%02x\n", e->h_dest[0], e->h_dest[1], e->h_dest[2],
++			e->h_dest[3], e->h_dest[4], e->h_dest[5]);
++	printk("src:%02x-%02x-%02x-%02x-%02x-%02x\n", e->h_source[0], e->h_source[1], e->h_source[2],
++			e->h_source[3], e->h_source[4], e->h_source[5]);
++	printk("dev:%08x\n", skb->dev);
++	printk("len:%d\n", skb->len);
++	printk("proto:%04x\n", skb->protocol);
++	printk("head:%08x\n", skb->head);
++	printk("data:%08x\n", skb->data);
++	printk("tail:%08x\n", skb->tail);
++	printk("end:%08x\n", skb->end);
++	printk("truesize:%d\n", skb->truesize);
++	printk("inner_protocol:%x\n", skb->inner_protocol);
++	printk("inner_transport_header:%d\n", skb->inner_transport_header);
++	printk("inner_network_header:%d\n", skb->inner_network_header);
++	printk("inner_mac_header:%d\n", skb->inner_mac_header);
++	printk("transport_header:%d\n", skb->transport_header);
++	printk("network_header:%d\n", skb->network_header);
++	printk("mac_header:%d\n", skb->mac_header);
++	printk("sock:%08x\n", skb->sk);
++	printk("skb_dst:%08x\n", skb_dst(skb));
++	LIMIT_NETDEBUG(KERN_DEBUG "From %pI4:%u %d/%d to %pI4:%u\n",
++		       &saddr, ntohs(uh->source),
++		       ulen, skb->len,
++		       &daddr, ntohs(uh->dest));
++}
+ /*
+  *	All we need to do is get the socket, and then do a checksum.
+  */
+@@ -1714,6 +1757,7 @@ int __udp4_lib_rcv(struct sk_buff *skb, struct udp_table *udptable,
+ 	struct rtable *rt = skb_rtable(skb);
+ 	__be32 saddr, daddr;
+ 	struct net *net = dev_net(skb->dev);
++	static int test = 0;
+ 
+ 	/*
+ 	 *  Validate the packet.
+@@ -1739,6 +1783,7 @@ int __udp4_lib_rcv(struct sk_buff *skb, struct udp_table *udptable,
+ 	if (udp4_csum_init(skb, uh, proto))
+ 		goto csum_error;
+ 
++
+ 	sk = skb_steal_sock(skb);
+ 	if (sk) {
+ 		struct dst_entry *dst = skb_dst(skb);
+@@ -1762,7 +1807,6 @@ int __udp4_lib_rcv(struct sk_buff *skb, struct udp_table *udptable,
+ 
+ 		sk = __udp4_lib_lookup_skb(skb, uh->source, uh->dest, udptable);
+ 	}
+-
+ 	if (sk != NULL) {
+ 		int ret;
+ 
+@@ -1956,6 +2000,8 @@ int udp_rcv(struct sk_buff *skb)
+ 	return __udp4_lib_rcv(skb, &udp_table, IPPROTO_UDP);
+ }
+ 
